@@ -5,12 +5,18 @@ output:
     keep_md: true
 ---
 
+```{r setup}
+suppressMessages(library(tidyverse))
+```
 
 ## Loading and preprocessing the data
 
-```{r loaddata}
-library(tidyverse)
+Dataset variables:
+* **steps**: Number of steps taking in a 5-minute interval (missing values are coded as `NA`)
+* **date**: The date on which the measurement was taken in `YYYY-MM-DD` format
+* **interval**: Identifier for the 5-minute interval in which measurement was taken
 
+```{r loaddata}
 if (!file.exists("./data")) {
     dir.create("./data")
 }
@@ -24,7 +30,7 @@ if (!file.exists("./data/activity.csv")) {
     unzip("./activity.zip", exdir = "./data", overwrite = TRUE)
 }
 
-df_activity <- read_csv(
+activity <- read_csv(
     "./data/activity.csv",
     col_types = cols(
         steps = col_integer(),
@@ -36,14 +42,50 @@ df_activity <- read_csv(
 
 ## What is mean total number of steps taken per day?
 
+```{r totalsteps}
+sum_activity <- activity %>%
+    group_by(date) %>%
+    summarize(daily_step = sum(steps))
 
+with(sum_activity, hist(daily_step))
+```
+
+mean = `r prettyNum(mean(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
+median = `r prettyNum(median(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
 
 ## What is the average daily activity pattern?
 
+```{r averagestep}
+sum_activity2 <- activity %>%
+    group_by(interval) %>%
+    summarize(average_step = mean(steps, na.rm = TRUE))
 
+with(sum_activity2, plot(interval, average_step, type = "l"))
+```
+
+Interval with maximum value = `r sum_activity2[which.max(sum_activity2$average_step), 1]`  
+Maximum average step value = `r sum_activity2[which.max(sum_activity2$average_step), 2]`
 
 ## Imputing missing values
 
+Total number of missing step values = `r sum(is.na(activity$steps))`
 
+### Strategy to replace missing values
+Replace `NA` with 5-minute interval average across all days
+
+```{r impute}
+activity2 <- activity %>%
+    mutate(steps = ifelse(is.na(steps),
+                      sum_activity2$average_step[match(sum_activity2$interval,interval)], steps))
+
+sum_activity3 <- activity2 %>%
+    group_by(date) %>%
+    summarize(daily_step = sum(steps))
+
+with(sum_activity3, hist(daily_step))
+```
+
+mean = `r prettyNum(mean(sum_activity3$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
+median = `r prettyNum(median(sum_activity3$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
 
 ## Are there differences in activity patterns between weekdays and weekends?
