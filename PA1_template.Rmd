@@ -7,14 +7,10 @@ output:
 
 ```{r setup}
 suppressMessages(library(tidyverse))
+suppressMessages(library(lubridate))
 ```
 
 ## Loading and preprocessing the data
-
-Dataset variables:
-* **steps**: Number of steps taking in a 5-minute interval (missing values are coded as `NA`)
-* **date**: The date on which the measurement was taken in `YYYY-MM-DD` format
-* **interval**: Identifier for the 5-minute interval in which measurement was taken
 
 ```{r loaddata}
 if (!file.exists("./data")) {
@@ -40,6 +36,16 @@ activity <- read_csv(
     )
 ```
 
+Dataset variables:
+
+* **steps**: Number of steps taking in a 5-minute interval (missing values are coded as `NA`)
+* **date**: The date on which the measurement was taken in `YYYY-MM-DD` format
+* **interval**: Identifier for the 5-minute interval in which measurement was taken
+
+```{r viewactivity}
+str(activity)
+```
+
 ## What is mean total number of steps taken per day?
 
 ```{r totalsteps}
@@ -47,24 +53,24 @@ sum_activity <- activity %>%
     group_by(date) %>%
     summarize(daily_step = sum(steps))
 
-with(sum_activity, hist(daily_step))
+qplot(daily_step, data = sum_activity, binwidth = 2000)
 ```
 
-mean = `r prettyNum(mean(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
-median = `r prettyNum(median(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
+Daily step mean = `r prettyNum(mean(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
+Daily step median = `r prettyNum(median(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
 
 ## What is the average daily activity pattern?
 
 ```{r averagestep}
-sum_activity2 <- activity %>%
+avg_activity <- activity %>%
     group_by(interval) %>%
     summarize(average_step = mean(steps, na.rm = TRUE))
 
-with(sum_activity2, plot(interval, average_step, type = "l"))
+qplot(interval, average_step, data = avg_activity, geom = "line")
 ```
 
-Interval with maximum value = `r sum_activity2[which.max(sum_activity2$average_step), 1]`  
-Maximum average step value = `r sum_activity2[which.max(sum_activity2$average_step), 2]`
+Interval with maximum value = `r avg_activity[which.max(avg_activity$average_step), 1]`  
+Maximum average step value = `r avg_activity[which.max(avg_activity$average_step), 2]`
 
 ## Imputing missing values
 
@@ -74,18 +80,35 @@ Total number of missing step values = `r sum(is.na(activity$steps))`
 Replace `NA` with 5-minute interval average across all days
 
 ```{r impute}
-activity2 <- activity %>%
+impute_activity <- activity %>%
     mutate(steps = ifelse(is.na(steps),
-                      sum_activity2$average_step[match(sum_activity2$interval,interval)], steps))
+                      avg_activity$average_step[match(avg_activity$interval,interval)], steps))
 
-sum_activity3 <- activity2 %>%
+sum_impute_activity <- impute_activity %>%
     group_by(date) %>%
     summarize(daily_step = sum(steps))
 
-with(sum_activity3, hist(daily_step))
+qplot(daily_step, data = sum_impute_activity, binwidth = 2000)
 ```
 
-mean = `r prettyNum(mean(sum_activity3$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
-median = `r prettyNum(median(sum_activity3$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
+Imputed daily step mean = `r prettyNum(mean(sum_impute_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
+Imputed daily step median = `r prettyNum(median(sum_impute_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
+
+Original daily step mean = `r prettyNum(mean(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`  
+Original daily step median = `r prettyNum(median(sum_activity$daily_step, na.rm = TRUE), scientific = FALSE, big.mark = ",")`
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r weekdays}
+impute_activity <- impute_activity %>%
+    mutate(dayname = wday(date, label = TRUE),
+           weekday = factor((dayname %in% c("Mon", "Tue", "Wed", "Thu", "Fri")),
+                            levels = c(FALSE, TRUE), labels = c("weekend", "weekday"))
+           )
+
+avg_impute_activity <- impute_activity %>%
+    group_by(interval, weekday) %>%
+    summarize(average_step = mean(steps))
+
+qplot(interval, average_step, color = weekday, data = avg_impute_activity, geom = "line")
+```
